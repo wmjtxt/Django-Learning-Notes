@@ -1,6 +1,9 @@
 学习Django
 ====
 
+[![Python Version](https://img.shields.io/badge/python-3.6.5-brightgreen.svg)](https://python.org)
+[![Django Version](https://img.shields.io/badge/django-1.11.4-brightgreen.svg)](https://djangoproject.com)
+
 最近在学习Python，看小甲鱼的视频，并参考了[TwoWater](https://github.com/TwoWater)的[草根学Python](https://github.com/TwoWater/Python), 其中提到了Django，和国外一个博客上的Django教程。遂开始学习Django.
 
 ## Django教程
@@ -44,6 +47,7 @@
 - [Part7 部署](#part7-部署)
 
 # Part1 入门
+[top](#学习Django)
 
 ## 环境搭建
 * 安装python3
@@ -121,6 +125,8 @@ urlpatterns = [
 执行命令`python manage.py runserver`，在浏览器打开[http://127.0.0.1:8000](http://127.0.0.1:8000)，可以看到效果啦
 
 # Part2 基础
+
+[top](#学习Django)
 
 ## 论坛项目
 项目是一个论坛系统，由多个板块(Boards)组成, 板块由主题帖(Topic)组成，主题帖里有回复帖(Post)，主题帖和回复帖均由用户(User)创建。
@@ -326,6 +332,8 @@ class HomeTests(TestCase):
 
 # Part3 进阶
 
+[top](#学习Django)
+
 ## URLs
 
 Django项目里有一个root URLconf, 在settings.py里面可以找到
@@ -405,6 +413,17 @@ def board_topics(request, pk):#new
 ## 表单
 
 # Part4 身份验证
+
+[top](#学习Django)
+
 # Part5 Django ORM
+
+[top](#学习Django)
+
 # Part6 基于类的视图
+
+[top](#学习Django)
+
 # Part7 部署
+
+[top](#学习Django)
