@@ -31,7 +31,7 @@
     - [设置Template](#设置template)
     - [测试主页](#测试主页)
     - [静态文件设置](#静态文件设置)
-    - [Django Admin](#django\ admin)
+    - [Django Admin](#django-admin)
 - [Part3 进阶](#part3进阶)
     - [URLs](#urls)
     - [设置Topics页面](#设置topics页面)
@@ -317,7 +317,7 @@ class HomeTests(TestCase):
 </style>
 ```
 
-## Django\ Admin
+## Django Admin
 
 执行`python manage.py createsuperuser`, 依次输入Username, Email, Password即可
 
