@@ -18,12 +18,12 @@
 
 # 目录
 
-- [Part1 入门](#part1 入门)
+- [Part1 入门](#part1入门)
     - [环境搭建](#环境搭建)
     - [Django项目](#django项目)
     - [Django应用](#django应用)
     - [Hello,World](#helloworld)
-- [Part2 基础](#part2 基础)
+- [Part2 基础](#part2基础)
     - [论坛项目](#论坛项目)
     - [Django模型设计](#django模型设计)
     - [迁移模型](#迁移模型)
@@ -31,7 +31,7 @@
     - [设置Template](#设置template)
     - [测试主页](#测试主页)
     - [静态文件设置](#静态文件设置)
-    - [Django Admin](#django admin)
+    - [Django Admin](#django\ admin)
 - [Part3 进阶](#part3进阶)
     - [URLs](#urls)
     - [设置Topics页面](#设置topics页面)
@@ -43,7 +43,7 @@
 - [Part6 基于类的视图](#part6基于类的视图)
 - [Part7 部署](#part7部署)
 
-# Part1 入门
+# Part1.入门
 
 ## 环境搭建
 * 安装python3
@@ -118,9 +118,9 @@ urlpatterns = [
 ]
 ```
 
-执行命令`python manage.py runserver`，在浏览器打开http://127.0.0.1:8000，可以看到效果啦
+执行命令`python manage.py runserver`，在浏览器打开[http://127.0.0.1:8000](http://127.0.0.1:8000)，可以看到效果啦
 
-# Part2基础
+# Part2.基础
 
 ## 论坛项目
 项目是一个论坛系统，由多个板块(Boards)组成, 板块由主题帖(Topic)组成，主题帖里有回复帖(Post)，主题帖和回复帖均由用户(User)创建。
@@ -317,11 +317,11 @@ class HomeTests(TestCase):
 </style>
 ```
 
-## Django Admin
+## Django\ Admin
 
 执行`python manage.py createsuperuser`, 依次输入Username, Email, Password即可
 
-启动服务后，访问http://127.0.0.1:8000/admin/可以看到登录页面，用刚刚设置的
+启动服务后，访问[http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)可以看到登录页面，用刚刚设置的
 用户名和密码可以登录, 登录进去以后可以完成一些操作。
 
 # Part3 进阶
