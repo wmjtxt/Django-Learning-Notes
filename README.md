@@ -18,12 +18,12 @@
 
 # 目录
 
-- [Part1 入门](#part1入门)
+- [Part1 入门](#part1-入门)
     - [环境搭建](#环境搭建)
     - [Django项目](#django项目)
     - [Django应用](#django应用)
     - [Hello,World](#helloworld)
-- [Part2 基础](#part2基础)
+- [Part2 基础](#part2-基础)
     - [论坛项目](#论坛项目)
     - [Django模型设计](#django模型设计)
     - [迁移模型](#迁移模型)
@@ -32,22 +32,22 @@
     - [测试主页](#测试主页)
     - [静态文件设置](#静态文件设置)
     - [Django Admin](#django-admin)
-- [Part3 进阶](#part3进阶)
+- [Part3 进阶](#part3-进阶)
     - [URLs](#urls)
     - [设置Topics页面](#设置topics页面)
     - [测试Topics页面](#测试Topics页面)
     - [可重用Templates](#可重用templates)
     - [表单](#表单)
-- [Part4 身份验证](#part4身份验证)
-- [Part5 Django ORM](#part5djangoorm)
-- [Part6 基于类的视图](#part6基于类的视图)
-- [Part7 部署](#part7部署)
+- [Part4 身份验证](#part4-身份验证)
+- [Part5 Django ORM](#part5-djangoorm)
+- [Part6 基于类的视图](#part6-基于类的视图)
+- [Part7 部署](#part7-部署)
 
-# Part1.入门
+# Part1 入门
 
 ## 环境搭建
 * 安装python3
-    * 略
+    * 安装方法略，我是之前安装的，版本是3.6.5
 * 安装Virtualenv
     * `sudo pip3 install virtualenv`
 * 使用virtualenv
@@ -120,7 +120,7 @@ urlpatterns = [
 
 执行命令`python manage.py runserver`，在浏览器打开[http://127.0.0.1:8000](http://127.0.0.1:8000)，可以看到效果啦
 
-# Part2.基础
+# Part2 基础
 
 ## 论坛项目
 项目是一个论坛系统，由多个板块(Boards)组成, 板块由主题帖(Topic)组成，主题帖里有回复帖(Post)，主题帖和回复帖均由用户(User)创建。
@@ -404,3 +404,7 @@ def board_topics(request, pk):#new
 
 ## 表单
 
+# Part4 身份验证
+# Part5 Django ORM
+# Part6 基于类的视图
+# Part7 部署
