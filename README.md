@@ -4,20 +4,21 @@
 [![Python Version](https://img.shields.io/badge/python-3.6.5-brightgreen.svg)](https://python.org)
 [![Django Version](https://img.shields.io/badge/django-1.11.4-brightgreen.svg)](https://djangoproject.com)
 
-最近在学习Python，看小甲鱼的视频，并参考了[TwoWater](https://github.com/TwoWater)的[草根学Python](https://github.com/TwoWater/Python), 其中提到了Django，和国外一个博客上的Django教程。遂开始学习Django.
+最近在学习Python，看小甲鱼的视频，并参考了[TwoWater](https://github.com/TwoWater)的[草根学Python](https://github.com/TwoWater/Python), 其中提到了Django，和国外一个博客上的Django教程。遂开始学习Django。
 
-## Django教程
+**Django教程**: [A Complete Beginner's Guide to Django](https://simpleisbetterthancomplex.com/series/beginners-guide/1.11/)。该教程共包含7个部分（Part）,以搭建一个论坛为例子，较为详细地介绍了Django搭建流程。
 
-一个浅显易懂的Django教程: [A Complete Beginner's Guide to Django](https://simpleisbetterthancomplex.com/series/beginners-guide/1.11/)
+在Github上有关于它的中文翻译: [A Complete Beginner's Guide to Django 翻译计划](https://github.com/wzhbingo/django-beginners-guide), 不过只有前2个Part是完整翻译的，剩下的没翻译完，好像是中止了，所以后面的部分我都是看的英文原版。
 
-该教程共包含7个部分（Part）,以搭建一个论坛为例子，较为详细地介绍了Django搭建流程。
-
-在Github上有关于它的中文翻译: [A Complete Beginner's Guide to Django 翻译计划](https://github.com/wzhbingo/django-beginners-guide), 不过只有前2个Part是完整翻译的，剩下的没翻译完，好像是中止了，所以后面的部分我都是看的英文原版)。
-
-根据教程一步一步执行命令，遇到问题并解决问题，虽然大多数问题是漏了某个步骤或某行代码，但在解决问题的过程中会仔细查看代码和步骤，这样就加深了理解。而且，由于其中涉及了不少HTML, CSS等相关
-知识，需要的时候也去看看，学到不少。
+采用笨方法，根据教程一步步走，遇到问题并解决问题，虽然大多数问题是漏了某个步骤或某行代码，但在解决问题的过程中会仔细查看代码和步骤，也加深了理解。而且由于其中涉及了不少HTML, CSS等相关知识，需要的时候也去看看，学到不少。
 
 为防止遗忘，自己动手做一个简略版的记录，也方便以后需要的时候回看。 
+
+**学习进度**
+|Part1|Part2|Part3|Part4|Part5|Part6|Part7|
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+|&radic;|&radic;|&radic;|Learning|||||
+
 
 # 目录
 
@@ -39,9 +40,16 @@
     - [URLs](#urls)
     - [设置Topics页面](#设置topics页面)
     - [测试Topics页面](#测试Topics页面)
+    - [添加links](#添加links)
     - [可重用Templates](#可重用templates)
-    - [表单](#表单)
-- [Part4 身份验证](#part4-身份验证)
+    - [Topbar及其字体](#topbar及其字体)
+    - [new\_topic页面](#new-topic页面)
+    - [new\_topic表单](#new-topic表单)
+    - [Forms API](#form-api)
+    - [提交Bootstrap表单](#提交bootstrap表单)
+    - [可重用表单模板](#可重用表单模板)
+    - [测试表单](#测试表单)
+- [Part4 身份验证(Learning)](#part4-身份验证)
 - [Part5 Django ORM](#part5-djangoorm)
 - [Part6 基于类的视图](#part6-基于类的视图)
 - [Part7 部署](#part7-部署)
@@ -356,6 +364,7 @@ def url(regex, view, kwargs=None, name=None):
 设置Topics页面需要如下三个步骤：
 
 **首先**，在**url.py**里添加新的URL路由:
+
 **urls.py**
 ```python
 from django.conf.urls import url
@@ -371,6 +380,7 @@ urlpatterns = [
 ```
 
 **其次**，在views.py里新建board\_topics函数:
+
 **views.py**
 ```python
 from django.shortcuts import render
@@ -383,7 +393,9 @@ def board_topics(request, pk):#new
     board = Board.objects.get(pk=pk)
     return render(request, 'topics.html', {'board': board})
 ```
+
 **最后**，在templates文件夹，新建topics.html:
+
 **topics.html**
 ```html
 {% load static %}<!DOCTYPE html>
@@ -408,13 +420,523 @@ def board_topics(request, pk):#new
 
 ## 测试Topics页面
 
+**boards/tests.py**
+```python
+from django.core.urlresolvers import reverse
+from django.urls import resolve
+from django.test import TestCase
+from .views import home, board_topics
+from .models import Board
+
+class HomeTests(TestCase):
+    # ...
+
+class BoardTopicsTests(TestCase):
+    def setUp(self):
+        Board.objects.create(name='Django', description='Django board.')
+
+    def test_board_topics_view_success_status_code(self):
+        url = reverse('board_topics', kwargs={'pk': 1})
+        response = self.client.get(url)
+        self.assertEquals(response.status_code, 200)
+
+    def test_board_topics_view_not_found_status_code(self):
+        url = reverse('board_topics', kwargs={'pk': 99})
+        response = self.client.get(url)
+        self.assertEquals(response.status_code, 404)
+
+    def test_board_topics_url_resolves_board_topics_view(self):
+        view = resolve('/boards/1/')
+        self.assertEquals(view.func, board_topics)
+```
+
+用`setUp`创建Board实例来进行测试，因为在执行`python manage.py test`时，Django项目的数据库并没有开启，
+也就没办法读取里面的数据，所以测试时必须临时创建，在测试结束时销毁。
+
+## 添加links
+
+前面已经设置了Topics页面，却没有从主页前往Topics页面的links，也没有从Topics页面返回主页的links
+
+添加home--\>Topics's links, 只需修改home.html里面的一行
+```html
+{{ board.name }}
+```
+```html
+<a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a>
+```
+
+同样的，Topics--\>home, 也只需修改一行
+```html
+<li class="breadcrumb-item">Boards</li>
+```
+```html
+<li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+```
+
 ## 可重用Templates
 
-## 表单
+重构HTML
+
+添加base.html
+
+**templates/base.html**
+```html
+{% load static %}<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Django Boards{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+  </head>
+  <body>
+    <div class="container">
+      <ol class="breadcrumb my-4">
+        {% block breadcrumb %}
+        {% endblock %}
+      </ol>
+      {% block content %}
+      {% endblock %}
+    </div>
+  </body>
+</html>
+```
+
+所有的页面均以**base.html**为模板。可以看到**base.html**中有三个block: title, breadcrumb, content。
+
+从效果来看，`breadcrumb`相当于网页路径，类似于访问文件文件夹时的`pwd`。
+
+标题，路径，内容，大概是网页的三个最重要的要素。
+
+然后，以**base.html**为模板修改**home.html**和**topics.html**
+
+**templates/home.html**
+```html
+{% extends 'base.html' %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">Boards</li>
+{% endblock %}
+
+{% block content %}
+  <table class="table">
+    <thead class="thead-inverse">
+      <tr>
+        <th>Board</th>
+        <th>Posts</th>
+        <th>Topics</th>
+        <th>Last Post</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for board in boards %}
+        <tr>
+          <td>
+            <a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a>
+            <small class="text-muted d-block">{{ board.description }}</small>
+          </td>
+          <td class="align-middle">0</td>
+          <td class="align-middle">0</td>
+          <td></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
+```
+**templates/topics.html**
+```html
+{% extends 'base.html' %}
+
+{% block title %}
+  {{ board.name }} - {{ block.super }}
+{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item active">{{ board.name }}</li>
+{% endblock %}
+
+{% block content %}
+    <!-- just leaving it empty for now. we will add core here soon. -->
+{% endblock %}
+```
+
+## Topbar及其字体
+
+修改**base.html:**
+```html
+{% load static %}<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Django Boards{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css?family=Peralta" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  </head>
+  <body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand" href="{% url 'home' %}">Django Boards</a>
+      </div>
+    </nav>
+
+    <div class="container">
+      <ol class="breadcrumb my-4">
+        {% block breadcrumb %}
+        {% endblock %}
+      </ol>
+      {% block content %}
+      {% endblock %}
+    </div>
+  </body>
+</html>
+```
+可以看到, base.html两处作了改动：
+
+* 在`<body>..</body>`里面添加了`<nav>...</nav>`，即Topbar
+
+* 在`<head>..</head>`里面添加了如下两行代码，应用了google的`Peralta`字体
+```html
+    <link href="https://fonts.googleapis.com/css?family=Peralta" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+```
+
+此外，还需新建**static/css/app.css**:
+```css
+.navbar-brand {
+  font-family: 'Peralta', cursive;
+}
+```
+
+## new\_topic页面
+
+修改**urls.py**, 在`urlpatterns`添加:
+```python
+url(r'^boards/(?P<pk>\d+)/new/$', views.new_topic, name='new_topic'),
+```
+
+修改**views.py**, 添加`new_topic`函数:
+```python
+def new_topic(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    return render(request, 'new_topic.html', {'board': board})
+```
+新建**templates/new_topic.html**:
+```html
+{% extends 'base.html' %}
+
+{% block title %}Start a New Topic{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a></li>
+  <li class="breadcrumb-item active">New topic</li>
+{% endblock %}
+
+{% block content %}
+
+{% endblock %}
+```
+
+## new\_topic表单
+
+修改**templates/new_topic.html**
+```html
+{% extends 'base.html' %}
+
+{% block title %}Start a New Topic{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a></li>
+  <li class="breadcrumb-item active">New topic</li>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="id_subject">Subject</label>
+      <input type="text" class="form-control" id="id_subject" name="subject">
+    </div>
+    <div class="form-group">
+      <label for="id_message">Message</label>
+      <textarea class="form-control" id="id_message" name="message" rows="5"></textarea>
+    </div>
+    <button type="submit" class="btn btn-success">Post</button>
+  </form>
+{% endblock %}
+```
+
+## Forms API
+
+使用Forms API
+
+新建**boards/forms.py**:
+```python
+from django import forms
+from .models import Topic
+
+class NewTopicForm(forms.ModelForm):
+    message = forms.CharField(widget=forms.Textarea(), max_length=4000)
+
+    class Meta:
+        model = Topic
+        fields = ['subject', 'message']
+```
+
+修改**boards/views.py**中的`new_topic`函数：
+```python
+from django.contrib.auth.models import User
+from django.shortcuts import render, redirect, get_object_or_404
+from .forms import NewTopicForm
+from .models import Board, Topic, Post
+
+def new_topic(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    user = User.objects.first()  # TODO: get the currently logged in user
+    if request.method == 'POST':
+        form = NewTopicForm(request.POST)
+        if form.is_valid():
+            topic = form.save(commit=False)
+            topic.board = board
+            topic.starter = user
+            topic.save()
+            post = Post.objects.create(
+                message=form.cleaned_data.get('message'),
+                topic=topic,
+                created_by=user
+            )
+            return redirect('board_topics', pk=board.pk)  # TODO: redirect to the created topic page
+    else:
+        form = NewTopicForm()
+    return render(request, 'new_topic.html', {'board': board, 'form': form})
+```
+
+更新**new\_topic.html**：
+```html
+{% extends 'base.html' %}
+
+{% block title %}Start a New Topic{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a></li>
+  <li class="breadcrumb-item active">New topic</li>
+{% endblock %}
+
+{% block content %}
+  <form method="post", novalidate>
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-success">Post</button>
+  </form>
+{% endblock %}
+```
+
+注意`novalidate`, 提交为空时，会提示`This field is required`
+
+在**forms.py**里添加`extra attributes`和`help_text`:
+
+**forms.py**
+```python
+from django import forms
+from .models import Topic
+
+class NewTopicForm(forms.ModelForm):
+    message = forms.CharField(
+        widget=forms.Textarea(
+            attrs={'rows': 5, 'placeholder': 'What is on your mind?'}
+        ),
+        max_length=4000,
+        help_text='The max length of the text is 4000.'
+    )
+
+    class Meta:
+        model = Topic
+        fields = ['subject', 'message']
+```
+
+## 提交Bootstrap表单
+
+使用`django-widget-tweaks`
+
+**首先**，安装:
+`pip install django-widget-tweaks`
+
+添加到**settings.py**的`INSTALLED_APPS`:
+```python
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+
+    'widget_tweaks',
+
+    'boards',
+]
+```
+其次，在**new\_topic.html**文件里应用:
+```html
+{% extends 'base.html' %}
+
+{% load widget_tweaks %}
+
+{% block title %}Start a New Topic{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a></li>
+  <li class="breadcrumb-item active">New topic</li>
+{% endblock %}
+
+{% block content %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    {% for field in form %}
+      <div class="form-group">
+        {{ field.label_tag }}
+
+        {% render_field field class="form-control" %}
+
+        {% if field.help_text %}
+          <small class="form-text text-muted">
+            {{ field.help_text }}
+          </small>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-success">Post</button>
+  </form>
+{% endblock %}
+```
+
+此时，你会发现，提交空内容时不会提示`This field is required`，接着用下面几行替换
+`{% render_field field class="form-control" %}`来判断输入内容是否有效
+```html
+      {% if form.is_bound %}
+        {% if field.errors %}
+
+          {% render_field field class="form-control is-invalid" %}
+          {% for error in field.errors %}
+            <div class="invalid-feedback">
+              {{ error }}
+            </div>
+          {% endfor %}
+
+        {% else %}
+          {% render_field field class="form-control is-valid" %}
+        {% endif %}
+      {% else %}
+        {% render_field field class="form-control" %}
+      {% endif %}
+```
+此时，输入为空时，不仅提示`This field is required`而且线框会变红, 而输入内容的线程变绿。
+
+也就是说表单有三种提交状态：
+* 初始状态，表单为空，并且`is not bound`, 表单线框为初始的颜色
+* 无效输入，表单线框为红色
+* 有效输入，表单线框为绿色
+
+## 可重用表单模板
+
+在`templates`文件夹下新建文件夹`includes`;
+
+在`includes`文件夹下新建文件**form.html**:
+
+```html
+{% load widget_tweaks %}
+
+{% for field in form %}
+  <div class="form-group">
+    {{ field.label_tag }}
+
+    {% if form.is_bound %}
+      {% if field.errors %}
+        {% render_field field class="form-control is-invalid" %}
+        {% for error in field.errors %}
+          <div class="invalid-feedback">
+            {{ error }}
+          </div>
+        {% endfor %}
+      {% else %}
+        {% render_field field class="form-control is-valid" %}
+      {% endif %}
+    {% else %}
+      {% render_field field class="form-control" %}
+    {% endif %}
+
+    {% if field.help_text %}
+      <small class="form-text text-muted">
+        {{ field.help_text }}
+      </small>
+    {% endif %}
+  </div>
+{% endfor %}
+```
+
+修改**new\_topic.html**:
+```html
+{% extends 'base.html' %}
+
+{% block title %}Start a New Topic{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a></li>
+  <li class="breadcrumb-item active">New topic</li>
+{% endblock %}
+
+{% block content %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include 'includes/form.html' %}
+    <button type="submit" class="btn btn-success">Post</button>
+  </form>
+{% endblock %}
+```
+
+其实，**form.html**就是把关于表单的部分单独存放, 这样项目中其他地方的表单判断均可引用。
+
+## 测试表单
+
+```python
+# ... other imports
+from .forms import NewTopicForm
+
+class NewTopicTests(TestCase):
+    # ... other tests
+
+    def test_contains_form(self):  # <- new test
+        url = reverse('new_topic', kwargs={'pk': 1})
+        response = self.client.get(url)
+        form = response.context.get('form')
+        self.assertIsInstance(form, NewTopicForm)
+
+    def test_new_topic_invalid_post_data(self):  # <- updated this one
+        '''
+        Invalid post data should not redirect
+        The expected behavior is to show the form again with validation errors
+        '''
+        url = reverse('new_topic', kwargs={'pk': 1})
+        response = self.client.post(url, {})
+        form = response.context.get('form')
+        self.assertEquals(response.status_code, 200)
+        self.assertTrue(form.errors)
+```
 
 # Part4 身份验证
 
 [top](#学习Django)
+
+
 
 # Part5 Django ORM
 
