@@ -24,7 +24,7 @@
     - [环境搭建](#环境搭建)
     - [Django项目](#django项目)
     - [Django应用](#django应用)
-    - [Hello,World](#hello,-world!)
+    - [Hello,World](#helloworld)
 - [Part2 基础](#part2-基础)
     - [论坛项目](#论坛项目)
     - [Django模型设计](#django模型设计)
@@ -102,7 +102,7 @@
 * **启用boards应用**
     * 找到settings.py的`INSTALLED_APPS`列表, 将应用`'boards'`添加到该列表中。
 
-## Hello, World!
+## Hello,World
 
 在views.py和urls.py中添加如下代码:
 
