@@ -8,11 +8,9 @@
 
 **Django教程**: [A Complete Beginner's Guide to Django](https://simpleisbetterthancomplex.com/series/beginners-guide/1.11/)。该教程共包含7个部分（Part）,以搭建一个论坛为例子，较为详细地介绍了Django搭建流程。
 
-在Github上有关于它的中文翻译: [A Complete Beginner's Guide to Django 翻译计划](https://github.com/wzhbingo/django-beginners-guide), 不过只有前2个Part是完整翻译的，剩下的没翻译完，好像是中止了，所以后面的部分我都是看的英文原版。
+在Github上有关于它的中文翻译: [A Complete Beginner's Guide to Django 翻译计划](https://github.com/wzhbingo/django-beginners-guide), 不过目前(2020.04.19)只有前2个Part是完整翻译的，Part3翻译了一部分，剩下的几个部分都还没翻译，该repo也很久未更新，或已中止，所以后面的几个部分只能看英文原版。
 
-采用笨方法，根据教程一步步走，遇到问题并解决问题，虽然大多数问题是漏了某个步骤或某行代码，但在解决问题的过程中会仔细查看代码和步骤，也加深了理解。而且由于其中涉及了不少HTML, CSS等相关知识，需要的时候也去看看，学到不少。
-
-为防止遗忘，自己动手做一个简略版的记录，也方便以后需要的时候回看。 
+学习过程中收获很多, 为防止遗忘，自己动手做一个简略版的记录，也方便以后需要的时候回看。 
 
 **学习进度**
 |Part1|Part2|Part3|Part4|Part5|Part6|Part7|
@@ -26,7 +24,7 @@
     - [环境搭建](#环境搭建)
     - [Django项目](#django项目)
     - [Django应用](#django应用)
-    - [Hello,World](#helloworld)
+    - [Hello,World](#hello,-world!)
 - [Part2 基础](#part2-基础)
     - [论坛项目](#论坛项目)
     - [Django模型设计](#django模型设计)
