@@ -48,6 +48,13 @@
     - [可重用表单模板](#可重用表单模板)
     - [测试表单](#测试表单)
 - [Part4 身份验证(Learning)](#part4-身份验证)
+    - [创建accounts APP](#创建accounts-app)
+    - [注册](#注册)
+    - [退出](#退出)
+    - [用户菜单](#用户菜单)
+    - [登录](#登录)
+    - [重置密码](#重置密码)
+    - [修改密码](#修改密码)
 - [Part5 Django ORM](#part5-djangoorm)
 - [Part6 基于类的视图](#part6-基于类的视图)
 - [Part7 部署](#part7-部署)
@@ -934,7 +941,50 @@ class NewTopicTests(TestCase):
 
 [top](#学习Django)
 
+这部分介绍用户相关的一些操作, 注册、登录、退出、修改密码等。
 
+## 创建accounts APP
+
+首先，需要创建accounts APP: `django-admin startapp accounts`
+
+并把**accounts** app添加到settings的`INSTALLED_APPS`
+
+## 注册
+
+修改**myproject/urls.py**:
+```python
+from django.conf.urls import url
+from django.contrib import admin
+
+from accounts import views as accounts_views
+from boards import views
+
+urlpatterns = [
+    url(r'^$', views.home, name='home'),
+    url(r'^signup/$', accounts_views.signup, name='signup'),
+    url(r'^boards/(?P<pk>\d+)/$', views.board_topics, name='board_topics'),
+    url(r'^boards/(?P<pk>\d+)/new/$', views.new_topic, name='new_topic'),
+    url(r'^admin/', admin.site.urls),
+]
+```
+
+在**accounts/views.py**里面添加`signup`函数:
+```python
+from django.shortcuts import render
+
+def signup(request):
+    return render(request, 'signup.html')
+```
+
+新建**templates/signup.html**:
+```html
+```
+
+## 退出
+## 用户菜单
+## 登录
+## 重置密码
+## 修改密码
 
 # Part5 Django ORM
 
