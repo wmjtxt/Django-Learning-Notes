@@ -50,9 +50,11 @@
 - [Part4 身份验证(Learning)](#part4-身份验证)
     - [创建accounts APP](#创建accounts-app)
     - [注册](#注册)
+    - [添加背景](#添加背景)
     - [退出](#退出)
-    - [用户菜单](#用户菜单)
+    - [显示用户下拉菜单](#显示用户下拉菜单)
     - [登录](#登录)
+    - [创建Templates Tags](#创建templates-tags)
     - [重置密码](#重置密码)
     - [修改密码](#修改密码)
 - [Part5 Django ORM](#part5-djangoorm)
@@ -978,12 +980,505 @@ def signup(request):
 
 新建**templates/signup.html**:
 ```html
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>Sign up</h2>
+{% endblock %}
+```
+
+对于用户相关操作（sign up, log in password reset），不需要`top bar`，
+因此要修改**templates/base.html**, 将`top bar`放到`{block body}`里面，同时，添加一个
+`block stylesheet`用于添加CSS代码
+```html
+{% load static %}<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Django Boards{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css?family=Peralta" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    {% block stylesheet %}{% endblock %}  <!-- HERE -->
+  </head>
+  <body>
+    {% block body %}  <!-- HERE -->
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+          <a class="navbar-brand" href="{% url 'home' %}">Django Boards</a>
+        </div>
+      </nav>
+      <div class="container">
+        <ol class="breadcrumb my-4">
+          {% block breadcrumb %}
+          {% endblock %}
+        </ol>
+        {% block content %}
+        {% endblock %}
+      </div>
+    {% endblock body %}  <!-- AND HERE -->
+  </body>
+</html>
+```
+
+在**signup.html**里使用Django自带的`UserCreationForm`:
+```html
+{% extends 'base.html' %}
+
+{% block body %}
+  <div class="container">
+    <h2>Sign up</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="btn btn-primary">Create an account</button>
+    </form>
+  </div>
+{% endblock %}
+```
+
+在**signup.html**里引用`includes/form.html`:
+```html
+{% extends 'base.html' %}
+
+{% block body %}
+  <div class="container">
+    <h2>Sign up</h2>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include 'includes/form.html' %}
+      <button type="submit" class="btn btn-primary">Create an account</button>
+    </form>
+  </div>
+{% endblock %}
+```
+
+此时，会出现一些乱码，有必要修改一下**includes/form.html**:
+```html
+{% load widget_tweaks %}
+
+{% for field in form %}
+  <div class="form-group">
+    {{ field.label_tag }}
+
+    <!-- code suppressed for brevity -->
+
+    {% if field.help_text %}
+      <small class="form-text text-muted">
+        {{ field.help_text|safe }}  <!-- new code here -->
+      </small>
+    {% endif %}
+  </div>
+{% endfor %}
+```
+
+进一步修改**accounts/views.py**:
+```python
+from django.contrib.auth import login as auth_login
+from django.contrib.auth.forms import UserCreationForm
+from django.shortcuts import render, redirect
+
+def signup(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            auth_login(request, user)
+            return redirect('home')
+    else:
+        form = UserCreationForm()
+    return render(request, 'signup.html', {'form': form})
+```
+
+接着，把用户名添加到`top bar`, 需要修改**templates/base.html**的`top bar`部分:
+```html
+{% block body %}
+  <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
+    <div class="container">
+      <a class="navbar-brand" href="{% url 'home' %}">Django Boards</a>
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainMenu" aria-controls="mainMenu" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainMenu">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="#">{{ user.username }}</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <ol class="breadcrumb my-4">
+      {% block breadcrumb %}
+      {% endblock %}
+    </ol>
+    {% block content %}
+    {% endblock %}
+  </div>
+{% endblock body %}
+```
+
+前面的注册表单里面没有邮件这一项，因为UserCreationForm里面没有提供。所以我们需要自己来对它进行扩展。
+
+创建**accounts/forms.py**:
+```python
+from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
+
+class SignUpForm(UserCreationForm):
+    email = forms.CharField(max_length=254, required=True, widget=forms.EmailInput())
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'password1', 'password2')
+```
+
+然后，在**accounts/views.py**里面就直接用`SignUpForm`来代替`UserCreationForm`了
+```python
+from django.contrib.auth import login as auth_login
+from django.shortcuts import render, redirect
+
+from .forms import SignUpForm
+
+def signup(request):
+    if request.method == 'POST':
+        form = SignUpForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            auth_login(request, user)
+            return redirect('home')
+    else:
+        form = SignUpForm()
+    return render(request, 'signup.html', {'form': form})
+```
+
+## 添加背景
+
+* 首先在`static`文件夹下新建一个文件夹img.
+* 然后，在[https://www.toptal.com/designers/subtlepatterns/](https://www.toptal.com/designers/subtlepatterns/)下载一个背景图片，并放到static/img/目录下
+* 在static/css文件夹新建accounts.css：
+```css
+body {
+  background-image: url(../img/shattered.png);
+}
+
+.logo {
+  font-family: 'Peralta', cursive;
+}
+
+.logo a {
+  color: rgba(0,0,0,.9);
+}
+
+.logo a:hover,
+.logo a:active {
+  text-decoration: none;
+}
+```
+* 接着，修改templates/signup.html，应用accounts.css:
+```html
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block stylesheet %}
+  <link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
+{% block body %}
+  <div class="container">
+    <h1 class="text-center logo my-4">
+      <a href="{% url 'home' %}">Django Boards</a>
+    </h1>
+    <div class="row justify-content-center">
+      <div class="col-lg-8 col-md-10 col-sm-12">
+        <div class="card">
+          <div class="card-body">
+            <h3 class="card-title">Sign up</h3>
+            <form method="post" novalidate>
+              {% csrf_token %}
+              {% include 'includes/form.html' %}
+              <button type="submit" class="btn btn-primary btn-block">Create an account</button>
+            </form>
+          </div>
+          <div class="card-footer text-muted text-center">
+            Already have an account? <a href="#">Log in</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
 ```
 
 ## 退出
-## 用户菜单
+
+* 修改**urls.py**,添加路由：
+```python
+from django.conf.urls import url
+from django.contrib import admin
+from django.contrib.auth import views as auth_views
+
+from accounts import views as accounts_views
+from boards import views
+
+urlpatterns = [
+    url(r'^$', views.home, name='home'),
+    url(r'^signup/$', accounts_views.signup, name='signup'),
+    url(r'^logout/$', auth_views.LogoutView.as_view(), name='logout'),
+    url(r'^boards/(?P<pk>\d+)/$', views.board_topics, name='board_topics'),
+    url(r'^boards/(?P<pk>\d+)/new/$', views.new_topic, name='new_topic'),
+    url(r'^admin/', admin.site.urls),
+]
+```
+
+* 设置**settings.py**,添加`LOGOUT_REDIRECT_URL`变量:
+```python
+LOGOUT_REDIRECT_URL = 'home'
+```
+这样，退出以后，跳转到主页
+
+## 显示用户下拉菜单
+
+设置用户下拉菜单栏需要下载几个依赖文件：
+* jquery-x.x.x.min.js, 其中x.x.x是版本号, 下载地址: [https://jquery.com/download/](https://jquery.com/download/), 下载**compressed,production jQuery**最新版即可，我下的版本是3.5.0，下载时直接出来了内容页面，复制它们，保存在jquery-3.5.0.min.js，即可
+* popper.min.js, 下载地址: [https://popper.js.org/](https://popper.js.org/)，官网好像没有源码下载了，我是用npm下载的, 执行`npm i @popperjs/core`, 然后在`node_models/@popperjs/core/dist/umd`文件夹下找到`popper.min.js`。
+* bootstrap.min.js, 下载地址：[https://getbootstrap.com/](https://getbootstrap.com/)
+
+在文件夹**static**下新建文件夹**js**,将上面三个js文件放到该文件夹下。
+
+然后，修改**base.html**:
+```html
+{% load static %}<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Django Boards{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css?family=Peralta" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    {% block stylesheet %}{% endblock %}
+  </head>
+  <body>
+    {% block body %}
+    <!-- code suppressed for brevity -->
+    {% endblock body %}
+    <script src="{% static 'js/jquery-3.2.1.min.js' %}"></script>
+    <script src="{% static 'js/popper.min.js' %}"></script>
+    <script src="{% static 'js/bootstrap.min.js' %}"></script>
+  </body>
+</html>
+```
+
+修改**base.html**的<nav>...</nav>部分, 设置下拉菜单,并对用户是否登录进行判断:
+```html
+<nav class="navbar navbar-expand-sm navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="{% url 'home' %}">Django Boards</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainMenu" aria-controls="mainMenu" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="mainMenu">
+      {% if user.is_authenticated %} <!--判断用户是否登录-->
+        <ul class="navbar-nav ml-auto"> 
+          <li class="nav-item dropdown"> <!--下拉菜单-->
+            <a class="nav-link dropdown-toggle" href="#" id="userMenu" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              {{ user.username }}
+            </a>
+            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="userMenu">
+              <a class="dropdown-item" href="#">My account</a>
+              <a class="dropdown-item" href="#">Change password</a>
+              <div class="dropdown-divider"></div>
+              <a class="dropdown-item" href="{% url 'logout' %}">Log out</a>
+            </div>
+          </li> <!--下拉菜单-->
+        </ul>
+      {% else %}
+        <form class="form-inline ml-auto">
+          <a href="#" class="btn btn-outline-secondary">Log in</a>
+          <a href="{% url 'signup' %}" class="btn btn-primary ml-2">Sign up</a>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+```
+
 ## 登录
+
+* **urls.py**
+* **settings.py**
+* **base.html**
+* **login.html**
+
+**urls.py**
+```python
+from django.conf.urls import url
+from django.contrib import admin
+from django.contrib.auth import views as auth_views
+
+from accounts import views as accounts_views
+from boards import views
+
+urlpatterns = [
+    url(r'^$', views.home, name='home'),
+    url(r'^signup/$', accounts_views.signup, name='signup'),
+    url(r'^login/$', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
+    url(r'^logout/$', auth_views.LogoutView.as_view(), name='logout'),
+    url(r'^boards/(?P<pk>\d+)/$', views.board_topics, name='board_topics'),
+    url(r'^boards/(?P<pk>\d+)/new/$', views.new_topic, name='new_topic'),
+    url(r'^admin/', admin.site.urls),
+]
+```
+**settings.py**
+```python
+LOGIN_REDIRECT_URL = 'home'
+```
+**base.html**
+```html
+<a href="{% url 'login' %}" class="btn btn-outline-secondary">Log in</a>
+```
+**login.html**
+```html
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block stylesheet %}
+  <link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
+{% block body %}
+  <div class="container">
+    <h1 class="text-center logo my-4">
+      <a href="{% url 'home' %}">Django Boards</a>
+    </h1>
+    <div class="row justify-content-center">
+      <div class="col-lg-4 col-md-6 col-sm-8">
+        <div class="card">
+          <div class="card-body">
+            <h3 class="card-title">Log in</h3>
+            <form method="post" novalidate>
+              {% csrf_token %}
+              {% include 'includes/form.html' %}
+              <button type="submit" class="btn btn-primary btn-block">Log in</button>
+            </form>
+          </div>
+          <div class="card-footer text-muted text-center">
+            New to Django Boards? <a href="{% url 'signup' %}">Sign up</a>
+          </div>
+        </div>
+        <div class="text-center py-2">
+          <small>
+            <a href="#" class="text-muted">Forgot your password?</a>
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+```
+
+接着，考虑重构一些用户操作相关的HTML, 新建**base_accounts.html**文件
+```html
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block stylesheet %}
+  <link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
+{% block body %}
+  <div class="container">
+    <h1 class="text-center logo my-4">
+      <a href="{% url 'home' %}">Django Boards</a>
+    </h1>
+    {% block content %}
+    {% endblock %}
+  </div>
+{% endblock %}
+```
+并应用到**signup.html**和**login.html**
+
+**判断用户名是否存在**,在**includes/form.html**添加：
+```html
+{% load widget_tweaks %}
+
+{% if form.non_field_errors %}
+  <div class="alert alert-danger" role="alert">
+    {% for error in form.non_field_errors %}
+      <p{% if forloop.last %} class="mb-0"{% endif %}>{{ error }}</p>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% for field in form %}
+  <!-- code suppressed -->
+{% endfor %}
+```
+
+## 创建Templates Tags
+
+在boards文件夹下新建templatetags文件夹，并新建`__init__.py`和`form_tags.py`两个文件
+
+**form_tags.py**
+```python
+from django import template
+
+register = template.Library()
+
+@register.filter
+def field_type(bound_field):
+    return bound_field.field.widget.__class__.__name__
+
+@register.filter
+def input_class(bound_field):
+    css_class = ''
+    if bound_field.form.is_bound:
+        if bound_field.errors:
+            css_class = 'is-invalid'
+        elif field_type(bound_field) != 'PasswordInput':
+            css_class = 'is-valid'
+    return 'form-control {}'.format(css_class)
+```
+
+然后更新**includes/form.html**
+```html
+{% load form_tags widget_tweaks %}
+
+{% if form.non_field_errors %}
+  <div class="alert alert-danger" role="alert">
+    {% for error in form.non_field_errors %}
+      <p{% if forloop.last %} class="mb-0"{% endif %}>{{ error }}</p>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% for field in form %}
+  <div class="form-group">
+    {{ field.label_tag }}
+    {% render_field field class=field|input_class %}
+    {% for error in field.errors %}
+      <div class="invalid-feedback">
+        {{ error }}
+      </div>
+    {% endfor %}
+    {% if field.help_text %}
+      <small class="form-text text-muted">
+        {{ field.help_text|safe }}
+      </small>
+    {% endif %}
+  </div>
+{% endfor %}
+```
+
 ## 重置密码
+
+
+
 ## 修改密码
 
 # Part5 Django ORM
