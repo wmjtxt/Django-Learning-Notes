@@ -15,7 +15,7 @@
 **学习进度**
 |Part1|Part2|Part3|Part4|Part5|Part6|Part7|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|&radic;|&radic;|&radic;|Learning|||||
+|&radic;|&radic;|&radic;|&radic;|&radic;|Learning|||
 
 
 # 目录
@@ -58,6 +58,14 @@
     - [重置密码](#重置密码)
     - [修改密码](#修改密码)
 - [Part5 Django ORM](#part5-djangoorm)
+    - [保护视图](#保护视图)
+    - [用户认证](#用户认证)
+    - [主题帖视图](#主题帖视图)
+    - [回复帖视图](#回复帖视图)
+    - [查询集](#查询集)
+        - [主页的主题帖数、帖子数、最新回复](#主页的主题帖数帖子数最新回复)
+        - [主题帖的回帖数](#主题帖的回帖数)
+        - [主题帖的浏览数](#主题帖的浏览数)
 - [Part6 基于类的视图](#part6-基于类的视图)
 - [Part7 部署](#part7-部署)
 
@@ -1477,13 +1485,580 @@ def input_class(bound_field):
 
 ## 重置密码
 
+重置密码涉及到较多的URLs, 另外重置密码前需要先发送邮件，重置密码的URL放在邮件里
 
+* **myproject/settings.py**, 添加`EMAIL_BACKEND`变量
+```
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+```
+* urls.py
+```python
+url(r'^reset/$',
+    auth_views.PasswordResetView.as_view(
+        template_name='password_reset.html',
+        email_template_name='password_reset_email.html',
+        subject_template_name='password_reset_subject.txt'
+    ),
+    name='password_reset'),
+url(r'^reset/done/$',
+    auth_views.PasswordResetDoneView.as_view(template_name='password_reset_done.html'),
+    name='password_reset_done'),
+url(r'^reset/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,20})/$',
+    auth_views.PasswordResetConfirmView.as_view(template_name='password_reset_confirm.html'),
+    name='password_reset_confirm'),
+url(r'^reset/complete/$',
+    auth_views.PasswordResetCompleteView.as_view(template_name='password_reset_complete.html'),
+    name='password_reset_complete'),
+]
+```
+* templates/
+    * password_reset.html
+    ```html
+    {% extends 'base_accounts.html' %}
+    
+    {% block title %}Reset your password{% endblock %}
+    
+    {% block content %}
+      <div class="row justify-content-center">
+        <div class="col-lg-4 col-md-6 col-sm-8">
+          <div class="card">
+            <div class="card-body">
+              <h3 class="card-title">Reset your password</h3>
+              <p>Enter your email address and we will send you a link to reset your password.</p>
+              <form method="post" novalidate>
+                {% csrf_token %}
+                {% include 'includes/form.html' %}
+                <button type="submit" class="btn btn-primary btn-block">Send password reset email</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endblock %}
+    ```
+    * password_reset_subject.txt
+    ```txt
+    [Django Boards] Please reset your password
+    ```
+    * password_reset_email.html
+    ```html
+    Hi there,
+
+    Someone asked for a password reset for the email address {{ email }}.
+    Follow the link below:
+    {{ protocol }}://{{ domain }}{% url 'password_reset_confirm' uidb64=uid token=token %}
+    
+    In case you forgot your Django Boards username: {{ user.username }}
+    
+    If clicking the link above doesn't work, please copy and paste the URL
+    in a new browser window instead.
+    
+    If you've received this mail in error, it's likely that another user entered
+    your email address by mistake while trying to reset a password. If you didn't
+    initiate the request, you don't need to take any further action and can safely
+    disregard this email.
+    
+    Thanks,
+    
+    The Django Boards Team
+    ```
+    * password_reset_done.html
+    ```html
+    {% extends 'base_accounts.html' %}
+
+    {% block title %}Reset your password{% endblock %}
+    
+    {% block content %}
+      <div class="row justify-content-center">
+        <div class="col-lg-4 col-md-6 col-sm-8">
+          <div class="card">
+            <div class="card-body">
+              <h3 class="card-title">Reset your password</h3>
+              <p>Check your email for a link to reset your password. If it doesn't appear within a few minutes, check your spam folder.</p>
+              <a href="{% url 'login' %}" class="btn btn-secondary btn-block">Return to log in</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endblock %}
+    ```
+    * password_reset_confirm.html
+    ```html
+    {% extends 'base_accounts.html' %}
+    
+    {% block title %}
+      {% if validlink %}
+        Change password for {{ form.user.username }}
+      {% else %}
+        Reset your password
+      {% endif %}
+    {% endblock %}
+    
+    {% block content %}
+      <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8 col-sm-10">
+          <div class="card">
+            <div class="card-body">
+              {% if validlink %}
+                <h3 class="card-title">Change password for @{{ form.user.username }}</h3>
+                <form method="post" novalidate>
+                  {% csrf_token %}
+                  {% include 'includes/form.html' %}
+                  <button type="submit" class="btn btn-success btn-block">Change password</button>
+                </form>
+              {% else %}
+                <h3 class="card-title">Reset your password</h3>
+                <div class="alert alert-danger" role="alert">
+                  It looks like you clicked on an invalid password reset link. Please try again.
+                </div>
+                <a href="{% url 'password_reset' %}" class="btn btn-secondary btn-block">Request a new password reset link</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endblock %}
+    ```
+    * password_reset_complete.html
+    ```html
+    {% extends 'base_accounts.html' %}
+
+    {% block title %}Password changed!{% endblock %}
+    
+    {% block content %}
+      <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8 col-sm-10">
+          <div class="card">
+            <div class="card-body">
+              <h3 class="card-title">Password changed!</h3>
+              <div class="alert alert-success" role="alert">
+                You have successfully changed your password! You may now proceed to log in.
+              </div>
+              <a href="{% url 'login' %}" class="btn btn-secondary btn-block">Return to log in</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endblock %}
+    ```
 
 ## 修改密码
+
+* urls.py
+```python
+url(r'^settings/password/$', auth_views.PasswordChangeView.as_view(template_name='password_change.html'),
+    name='password_change'),
+url(r'^settings/password/done/$', auth_views.PasswordChangeDoneView.as_view(template_name='password_change_done.html'),
+    name='password_change_done'),
+```
+* settings.py
+```python
+LOGIN_URL = 'login'
+```
+* templates/
+    * password_change.html
+    ```html
+    {% extends 'base.html' %}
+
+    {% block title %}Change password{% endblock %}
+    
+    {% block breadcrumb %}
+      <li class="breadcrumb-item active">Change password</li>
+    {% endblock %}
+    
+    {% block content %}
+      <div class="row">
+        <div class="col-lg-6 col-md-8 col-sm-10">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            {% include 'includes/form.html' %}
+            <button type="submit" class="btn btn-success">Change password</button>
+          </form>
+        </div>
+      </div>
+    {% endblock %}
+    ```
+    * password_change_done.html
+    ```html
+    {% extends 'base.html' %}
+
+    {% block title %}Change password successful{% endblock %}
+    
+    {% block breadcrumb %}
+      <li class="breadcrumb-item"><a href="{% url 'password_change' %}">Change password</a></li>
+      <li class="breadcrumb-item active">Success</li>
+    {% endblock %}
+    
+    {% block content %}
+      <div class="alert alert-success" role="alert">
+        <strong>Success!</strong> Your password has been changed!
+      </div>
+      <a href="{% url 'home' %}" class="btn btn-secondary">Return to home page</a>
+    {% endblock %}
+    ```
 
 # Part5 Django ORM
 
 [top](#学习Django)
+
+## 保护视图
+
+对于`new_topic.html`这类页面，必须用户登录才能进去, 如果没登录就跳转到登录页面:
+
+Django提供了这个功能，只需要在**views.py**里的`new_topic`函数前面加上`@login_required`
+
+登录之后，还需要重定向到原来的页面。修改**templates/login.html**:
+```html
+<form method="post" novalidate>
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  {% include 'includes/form.html' %}
+  <button type="submit" class="btn btn-primary btn-block">Log in</button>
+</form>
+```
+
+## 用户认证
+
+**boards/views.py**
+```python
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .forms import NewTopicForm
+from .models import Board, Post
+
+@login_required
+def new_topic(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if request.method == 'POST':
+        form = NewTopicForm(request.POST)
+        if form.is_valid():
+            topic = form.save(commit=False)
+            topic.board = board
+            topic.starter = request.user  # <- here
+            topic.save()
+            Post.objects.create(
+                message=form.cleaned_data.get('message'),
+                topic=topic,
+                created_by=request.user  # <- and here
+            )
+            return redirect('board_topics', pk=board.pk)  # TODO: redirect to the created topic page
+    else:
+        form = NewTopicForm()
+    return render(request, 'new_topic.html', {'board': board, 'form': form})
+```
+
+## 主题帖视图
+
+* urls.py
+`url(r'^boards/(?P<pk>\d+)/topics/(?P<topic_pk>\d+)/$', views.topic_posts, name='topic_posts'),`
+* boards/views.py
+```python
+from django.shortcuts import get_object_or_404, render
+from .models import Topic
+
+def topic_posts(request, pk, topic_pk):
+    topic = get_object_or_404(Topic, board__pk=pk, pk=topic_pk)
+    return render(request, 'topic_posts.html', {'topic': topic})
+```
+* `templates/topic_posts.html`
+```python
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}{{ topic.subject }}{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' topic.board.pk %}">{{ topic.board.name }}</a></li>
+  <li class="breadcrumb-item active">{{ topic.subject }}</li>
+{% endblock %}
+
+{% block content %}
+
+  <div class="mb-4">
+    <a href="#" class="btn btn-primary" role="button">Reply</a>
+  </div>
+
+  {% for post in topic.posts.all %}
+    <div class="card mb-2">
+      <div class="card-body p-3">
+        <div class="row">
+          <div class="col-2">
+            <img src="{% static 'img/avatar.svg' %}" alt="{{ post.created_by.username }}" class="w-100">
+            <small>Posts: {{ post.created_by.posts.count }}</small>
+          </div>
+          <div class="col-10">
+            <div class="row mb-3">
+              <div class="col-6">
+                <strong class="text-muted">{{ post.created_by.username }}</strong>
+              </div>
+              <div class="col-6 text-right">
+                <small class="text-muted">{{ post.created_at }}</small>
+              </div>
+            </div>
+            {{ post.message }}
+            {% if post.created_by == user %}
+              <div class="mt-3">
+                <a href="#" class="btn btn-primary btn-sm" role="button">Edit</a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+{% endblock %}
+```
+
+## 回复帖视图
+
+* urls.py
+`url(r'^boards/(?P<pk>\d+)/topics/(?P<topic_pk>\d+)/reply/$', views.reply_topic, name='reply_topic'),`
+* boards/forms.py
+```python
+from django import forms
+from .models import Post
+
+class PostForm(forms.ModelForm):
+    class Meta:
+        model = Post
+        fields = ['message', ]
+```
+* boards/views.py
+```python
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404, redirect, render
+from .forms import PostForm
+from .models import Topic
+
+@login_required
+def new_topic(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    if request.method == 'POST':
+        form = NewTopicForm(request.POST)
+        if form.is_valid():
+            topic = form.save(commit=False)
+            # code suppressed ...
+            return redirect('topic_posts', pk=pk, topic_pk=topic.pk)  # <- here
+    # code suppressed ...
+
+@login_required
+def reply_topic(request, pk, topic_pk):
+    topic = get_object_or_404(Topic, board__pk=pk, pk=topic_pk)
+    if request.method == 'POST':
+        form = PostForm(request.POST)
+        if form.is_valid():
+            post = form.save(commit=False)
+            post.topic = topic
+            post.created_by = request.user
+            post.save()
+            return redirect('topic_posts', pk=pk, topic_pk=topic_pk)
+    else:
+        form = PostForm()
+    return render(request, 'reply_topic.html', {'topic': topic, 'form': form})
+
+```
+* templates/reply_topic.html
+```html
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Post a reply{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' topic.board.pk %}">{{ topic.board.name }}</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'topic_posts' topic.board.pk topic.pk %}">{{ topic.subject }}</a></li>
+  <li class="breadcrumb-item active">Post a reply</li>
+{% endblock %}
+
+{% block content %}
+
+  <form method="post" class="mb-4">
+    {% csrf_token %}
+    {% include 'includes/form.html' %}
+    <button type="submit" class="btn btn-success">Post a reply</button>
+  </form>
+
+  {% for post in topic.posts.all %}
+    <div class="card mb-2">
+      <div class="card-body p-3">
+        <div class="row mb-3">
+          <div class="col-6">
+            <strong class="text-muted">{{ post.created_by.username }}</strong>
+          </div>
+          <div class="col-6 text-right">
+            <small class="text-muted">{{ post.created_at }}</small>
+          </div>
+        </div>
+        {{ post.message }}
+      </div>
+    </div>
+  {% endfor %}
+
+{% endblock %}
+```
+
+* **templates/topic_posts.html**:
+```html
+{% for post in topic.posts.all %}
+  <div class="card mb-2 {% if forloop.first %}border-dark{% endif %}">
+    {% if forloop.first %}
+      <div class="card-header text-white bg-dark py-2 px-3">{{ topic.subject }}</div>
+    {% endif %}
+    <div class="card-body p-3">
+      <!-- code suppressed -->
+    </div>
+  </div>
+{% endfor %}
+```
+
+## 查询集
+
+显示主页的主题数、回帖数，以及主题帖的回帖数和浏览数
+
+### 主页的主题帖数、帖子数、最新回复
+
+首先，为所有的models添加`__str__`方法
+**boards/models.py**
+```python
+from django.db import models
+from django.utils.text import Truncator
+
+class Board(models.Model):
+    # ...
+    def __str__(self):
+        return self.name
+
+class Topic(models.Model):
+    # ...
+    def __str__(self):
+        return self.subject
+
+class Post(models.Model):
+    # ...
+    def __str__(self):
+        truncated_message = Truncator(self.message)
+        return truncated_message.chars(30)
+```
+
+主题数比较简单，可以直接用`board.topics.count()`表示
+
+而帖子数和最新回复需要修改**boards/models.py**
+```python
+from django.db import models
+
+class Board(models.Model):
+    name = models.CharField(max_length=30, unique=True)
+    description = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.name
+
+    def get_posts_count(self): # <-- new
+        return Post.objects.filter(topic__board=self).count()
+
+    def get_last_post(self):   # <-- new
+        return Post.objects.filter(topic__board=self).order_by('-created_at').first()
+```
+其中，`get_posts_count`返回board的帖子数, `get_last_post`返回board的最新回复
+
+然后，在`templates/home.html`里面的相应位置修改:
+`templates/home.html`
+```html
+    <tbody>
+      {% for board in boards %}
+        <tr>
+          <td>
+            <a href="{% url 'board_topics' board.pk %}">{{ board.name }}</a>
+            <small class="text-muted d-block">{{ board.description }}</small>
+          </td>
+          <td class="align-middle">
+            {{ board.get_posts_count }}
+          </td>
+          <td class="align-middle">
+            {{ board.topics.count }}
+          </td>
+          <td class="align-middle">
+            {% with post=board.get_last_post %}
+              {% if post %}
+                <small>
+                  <a href="{% url 'topic_posts' board.pk post.topic.pk %}">
+                    By {{ post.created_by.username }} at {{ post.created_at }}
+                  </a>
+                </small>
+              {% else %}
+                <small class="text-muted">
+                  <em>No posts yet.</em>
+                </small>
+              {% endif %}
+            {% endwith %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+```
+
+### 主题帖的回帖数
+
+* 在boards/views.py的`board_topics`函数里添加一行
+`topics = board.topics.order_by('-last_updated').annotate(replies=Count('posts') - 1)`
+* 然后修改templates/topics.html
+```html
+{% for topic in topics %}
+  <tr>
+    <td><a href="{% url 'topic_posts' board.pk topic.pk %}">{{ topic.subject }}</a></td>
+    <td>{{ topic.starter.username }}</td>
+    <td>{{ topic.replies }}</td>
+    <td>0</td>
+    <td>{{ topic.last_updated }}</td>
+  </tr>
+{% endfor %}
+```
+
+### 主题帖的浏览数
+
+显示主题帖的浏览数需要新建views field, 然后需要迁移（也就是将新添加的field更新到数据库）
+
+在boards/models.py文件里添加views field
+```python
+class Topic(models.Model):
+    subject = models.CharField(max_length=255)
+    last_updated = models.DateTimeField(auto_now_add=True)
+    board = models.ForeignKey(Board, related_name='topics')
+    starter = models.ForeignKey(User, related_name='topics')
+    views = models.PositiveIntegerField(default=0)  # <- here
+
+    def __str__(self):
+        return self.subject
+```
+boards/views.py
+```python
+from django.shortcuts import get_object_or_404, render
+from .models import Topic
+
+def topic_posts(request, pk, topic_pk):
+    topic = get_object_or_404(Topic, board__pk=pk, pk=topic_pk)
+    topic.views += 1
+    topic.save()
+    return render(request, 'topic_posts.html', {'topic': topic})
+```
+templates/topics.html
+```html
+{% for topic in topics %}
+  <tr>
+    <td><a href="{% url 'topic_posts' board.pk topic.pk %}">{{ topic.subject }}</a></td>
+    <td>{{ topic.starter.username }}</td>
+    <td>{{ topic.replies }}</td>
+    <td>{{ topic.views }}</td>  <!-- here -->
+    <td>{{ topic.last_updated }}</td>
+  </tr>
+{% endfor %}
+```
 
 # Part6 基于类的视图
 
