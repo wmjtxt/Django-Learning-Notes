@@ -15,7 +15,7 @@
 **学习进度**
 |Part1|Part2|Part3|Part4|Part5|Part6|Part7|
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|&radic;|&radic;|&radic;|&radic;|&radic;|Learning|||
+|&radic;|&radic;|&radic;|&radic;|&radic;|Learning||
 
 
 # 目录
@@ -2063,6 +2063,23 @@ templates/topics.html
 # Part6 基于类的视图
 
 [top](#学习Django)
+
+## 视图策略
+
+## 更新视图
+
+## 视图列表(分页)
+
+## 我的账户视图
+
+## 支持markdown
+
+## 人性化设置
+
+## 头像
+
+## 最后调整
+
 
 # Part7 部署
 
