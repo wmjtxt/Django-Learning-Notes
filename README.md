@@ -67,6 +67,14 @@
         - [主题帖的回帖数](#主题帖的回帖数)
         - [主题帖的浏览数](#主题帖的浏览数)
 - [Part6 基于类的视图](#part6-基于类的视图)
+    - [视图策略](#视图策略)
+    - [更新视图](#更新视图)
+    - [视图列表(分页)](#视图列表分页)
+    - [我的账户视图](#我的账户视图)
+    - [支持markdown](#支持markdown)
+    - [人性化设置](#人性化设置)
+    - [头像](#头像)
+    - [最后调整](#最后调整)
 - [Part7 部署](#part7-部署)
 
 # Part1 入门
@@ -2066,19 +2074,737 @@ templates/topics.html
 
 ## 视图策略
 
+常用的视图有三种：
+* Function-Based Views(FBV)
+* Class-Based Views(CBV)
+* Generic Class-Based Views(GCBV)
+
+FBV是最简单的视图，通过函数来接受一个`HttpRequest`，然后返回一个`HttpResponse`。
+
+CBV就是把定义视图的函数封装起来，放在一个类里，这个类扩展了`django.views.generic.View`这个抽象类。
+
+GCBV是内置的CBV。
+
 ## 更新视图
 
-## 视图列表(分页)
+现在用GCBV来实现编辑帖子（edit post）的视图
+
+修改**boards/views.py**
+```python
+from django.shortcuts import redirect
+from django.views.generic import UpdateView
+from django.utils import timezone
+
+class PostUpdateView(UpdateView):
+    model = Post
+    fields = ('message', )
+    template_name = 'edit_post.html'
+    pk_url_kwarg = 'post_pk'
+    context_object_name = 'post'
+
+    def form_valid(self, form):
+        post = form.save(commit=False)
+        post.updated_by = self.request.user
+        post.updated_at = timezone.now()
+        post.save()
+        return redirect('topic_posts', pk=post.topic.board.pk, topic_pk=post.topic.pk)
+```
+**urls.py**
+```python
+from django.conf.urls import url
+from boards import views
+
+urlpatterns = [
+    # ...
+    url(r'^boards/(?P<pk>\d+)/topics/(?P<topic_pk>\d+)/posts/(?P<post_pk>\d+)/edit/$',
+        views.PostUpdateView.as_view(), name='edit_post'),
+]
+```
+
+然后，在`topic_post.html`里添加链接
+```html
+{% if post.created_by == user %}
+  <div class="mt-3">
+    <a href="{% url 'edit_post' post.topic.board.pk post.topic.pk post.pk %}"
+       class="btn btn-primary btn-sm"
+       role="button">Edit</a>
+  </div>
+{% endif %}
+```
+
+`templates/edit_post.html`
+```html
+{% extends 'base.html' %}
+
+{% block title %}Edit post{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'home' %}">Boards</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'board_topics' post.topic.board.pk %}">{{ post.topic.board.name }}</a></li>
+  <li class="breadcrumb-item"><a href="{% url 'topic_posts' post.topic.board.pk post.topic.pk %}">{{ post.topic.subject }}</a></li>
+  <li class="breadcrumb-item active">Edit post</li>
+{% endblock %}
+
+{% block content %}
+  <form method="post" class="mb-4" novalidate>
+    {% csrf_token %}
+    {% include 'includes/form.html' %}
+    <button type="submit" class="btn btn-success">Save changes</button>
+    <a href="{% url 'topic_posts' post.topic.board.pk post.topic.pk %}" class="btn btn-outline-secondary" role="button">Cancel</a>
+  </form>
+{% endblock %}
+```
+
+* `login_required`
+
+## 视图列表
+
+采用GCBV视图策略，以`home.html`为例，修改`views.py`和`urls.py`
+**views.py**
+```python
+from django.views.generic import ListView
+from .models import Board
+
+class BoardListView(ListView):
+    model = Board
+    context_object_name = 'boards'
+    template_name = 'home.html'
+```
+**urls.py**
+```python
+from django.conf.urls import url
+from boards import views
+
+urlpatterns = [
+    url(r'^$', views.BoardListView.as_view(), name='home'),
+    # ...
+]
+```
+
+## 分页
+
+当帖子数太多时，就需要进行分页。
+
+分页之前，先添加一些帖子：
+
+* 首先，执行`python manage.py shell`，进入python命令行
+* 然后，依次执行以下命令就可以了：
+```python
+from django.contrib.auth.models import User
+from boards.models import Board, Topic, Post
+
+user = User.objects.first()
+
+board = Board.objects.get(name='Django')
+
+for i in range(100):
+    subject = 'Topic test #{}'.format(i)
+    topic = Topic.objects.create(subject=subject, board=board, starter=user)
+    Post.objects.create(message='Lorem ipsum...', topic=topic, created_by=user)
+```
+
+### FBV分页
+
+boards/views.py
+```python
+from django.db.models import Count
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.shortcuts import get_object_or_404, render
+from django.views.generic import ListView
+from .models import Board
+
+def board_topics(request, pk):
+    board = get_object_or_404(Board, pk=pk)
+    queryset = board.topics.order_by('-last_updated').annotate(replies=Count('posts') - 1)
+    page = request.GET.get('page', 1)
+
+    paginator = Paginator(queryset, 20)
+
+    try:
+        topics = paginator.page(page)
+    except PageNotAnInteger:
+        # fallback to the first page
+        topics = paginator.page(1)
+    except EmptyPage:
+        # probably the user tried to add a page number
+        # in the url, so we fallback to the last page
+        topics = paginator.page(paginator.num_pages)
+
+    return render(request, 'topics.html', {'board': board, 'topics': topics})
+```
+templates/topics.html:
+```html
+{% if topics.has_other_pages %}
+  <nav aria-label="Topics pagination" class="mb-4">
+    <ul class="pagination">
+      {% if topics.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ topics.previous_page_number }}">Previous</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Previous</span>
+        </li>
+      {% endif %}
+
+      {% for page_num in topics.paginator.page_range %}
+        {% if topics.number == page_num %}
+          <li class="page-item active">
+            <span class="page-link">
+              {{ page_num }}
+              <span class="sr-only">(current)</span>
+            </span>
+          </li>
+        {% else %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+          </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if topics.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ topics.next_page_number }}">Next</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Next</span>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}
+```
+
+### GCBV分页
+
+boards/views.py
+```python
+class TopicListView(ListView):
+    model = Topic
+    context_object_name = 'topics'
+    template_name = 'topics.html'
+    paginate_by = 20
+
+    def get_context_data(self, **kwargs):
+        kwargs['board'] = self.board
+        return super().get_context_data(**kwargs)
+
+    def get_queryset(self):
+        self.board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
+        queryset = self.board.topics.order_by('-last_updated').annotate(replies=Count('posts') - 1)
+        return queryset
+```
+urls.py
+```python
+from django.conf.urls import url
+from boards import views
+
+urlpatterns = [
+    # ...
+    url(r'^boards/(?P<pk>\d+)/$', views.TopicListView.as_view(), name='board_topics'),
+]
+```
+
+templates/topics.html
+```html
+{% block content %}
+  <div class="mb-4">
+    <a href="{% url 'new_topic' board.pk %}" class="btn btn-primary">New topic</a>
+  </div>
+
+  <table class="table mb-4">
+    <!-- table content suppressed -->
+  </table>
+
+  {% if is_paginated %}
+    <nav aria-label="Topics pagination" class="mb-4">
+      <ul class="pagination">
+        {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled">
+            <span class="page-link">Previous</span>
+          </li>
+        {% endif %}
+
+        {% for page_num in paginator.page_range %}
+          {% if page_obj.number == page_num %}
+            <li class="page-item active">
+              <span class="page-link">
+                {{ page_num }}
+                <span class="sr-only">(current)</span>
+              </span>
+            </li>
+          {% else %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+            </li>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled">
+            <span class="page-link">Next</span>
+          </li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+
+{% endblock %}
+```
+
+## 可重用分页模板
+
+事实上，不光主页需要分页，每个帖子的回复帖多了，也需要分页，所以采用模板实现会方便很多。
+
+boards/views.py
+```python
+class PostListView(ListView):
+    model = Post
+    context_object_name = 'posts'
+    template_name = 'topic_posts.html'
+    paginate_by = 2
+
+    def get_context_data(self, **kwargs):
+        self.topic.views += 1
+        self.topic.save()
+        kwargs['topic'] = self.topic
+        return super().get_context_data(**kwargs)
+
+    def get_queryset(self):
+        self.topic = get_object_or_404(Topic, board__pk=self.kwargs.get('pk'), pk=self.kwargs.get('topic_pk'))
+        queryset = self.topic.posts.order_by('created_at')
+        return queryset
+```
+urls.py
+```python
+from django.conf.urls import url
+from boards import views
+
+urlpatterns = [
+    # ...
+    url(r'^boards/(?P<pk>\d+)/topics/(?P<topic_pk>\d+)/$', views.PostListView.as_view(), name='topic_posts'),
+]
+```
+
+templates/includes/pagination.html
+```html
+{% if is_paginated %}
+  <nav aria-label="Topics pagination" class="mb-4">
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Previous</span>
+        </li>
+      {% endif %}
+
+      {% for page_num in paginator.page_range %}
+        {% if page_obj.number == page_num %}
+          <li class="page-item active">
+            <span class="page-link">
+              {{ page_num }}
+              <span class="sr-only">(current)</span>
+            </span>
+          </li>
+        {% else %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+          </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Next</span>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}
+```
+
+templates/topic_post.html
+```html
+{% block content %}
+
+  <div class="mb-4">
+    <a href="{% url 'reply_topic' topic.board.pk topic.pk %}" class="btn btn-primary" role="button">Reply</a>
+  </div>
+
+  {% for post in posts %}
+    <div class="card {% if forloop.last %}mb-4{% else %}mb-2{% endif %} {% if forloop.first %}border-dark{% endif %}">
+      {% if forloop.first %}
+        <div class="card-header text-white bg-dark py-2 px-3">{{ topic.subject }}</div>
+      {% endif %}
+      <div class="card-body p-3">
+        <div class="row">
+          <div class="col-2">
+            <img src="{% static 'img/avatar.svg' %}" alt="{{ post.created_by.username }}" class="w-100">
+            <small>Posts: {{ post.created_by.posts.count }}</small>
+          </div>
+          <div class="col-10">
+            <div class="row mb-3">
+              <div class="col-6">
+                <strong class="text-muted">{{ post.created_by.username }}</strong>
+              </div>
+              <div class="col-6 text-right">
+                <small class="text-muted">{{ post.created_at }}</small>
+              </div>
+            </div>
+            {{ post.message }}
+            {% if post.created_by == user %}
+              <div class="mt-3">
+                <a href="{% url 'edit_post' post.topic.board.pk post.topic.pk post.pk %}"
+                   class="btn btn-primary btn-sm"
+                   role="button">Edit</a>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  {% include 'includes/pagination.html' %}
+
+{% endblock %}
+```
+templates/topics.html
+```html
+{% block content %}
+  <div class="mb-4">
+    <a href="{% url 'new_topic' board.pk %}" class="btn btn-primary">New topic</a>
+  </div>
+
+  <table class="table mb-4">
+    <!-- table code suppressed -->
+  </table>
+
+  {% include 'includes/pagination.html' %}
+
+{% endblock %}
+```
 
 ## 我的账户视图
 
+accounts/views.py
+```python
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.urls import reverse_lazy
+from django.utils.decorators import method_decorator
+from django.views.generic import UpdateView
+
+@method_decorator(login_required, name='dispatch')
+class UserUpdateView(UpdateView):
+    model = User
+    fields = ('first_name', 'last_name', 'email', )
+    template_name = 'my_account.html'
+    success_url = reverse_lazy('my_account')
+
+    def get_object(self):
+        return self.request.user
+```
+urls.py
+```
+from django.conf.urls import url
+from accounts import views as accounts_views
+
+urlpatterns = [
+    # ...
+    url(r'^settings/account/$', accounts_views.UserUpdateView.as_view(), name='my_account'),
+]
+
+```
+
+templates/my_account.html
+```html
+{% extends 'base.html' %}
+
+{% block title %}My account{% endblock %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">My account</li>
+{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-lg-6 col-md-8 col-sm-10">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% include 'includes/form.html' %}
+        <button type="submit" class="btn btn-success">Save changes</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+```
+base.html
+```html
+<a class="dropdown-item" href="{% url 'my_account' %}">My account</a>
+```
+
 ## 支持markdown
 
+* 首先，安装markdown: `pip install markdown`
+
+修改boards/models.py
+```python
+from django.db import models
+from django.utils.html import mark_safe
+from markdown import markdown
+
+class Post(models.Model):
+    # ...
+
+    def get_message_as_markdown(self):
+        return mark_safe(markdown(self.message, safe_mode='escape'))
+```
+
+把`topic_posts.html`里面的
+```html
+{{ post.message }}
+```
+改为
+```html
+{{ post.get_message_as_markdown }}
+```
+
+### markdown编辑器
+
 ## 人性化设置
+
+修改最新回帖时间，显示为距离当前时间多久, 比如几分钟前、几小时前或几天前
+
+首先，在settings.py里添加`django.contrib.humanize`变量
+```python
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'django.contrib.humanize',  # <- here
+
+    'widget_tweaks',
+
+    'accounts',
+    'boards',
+]
+```
+
+然后，修改templates/topics.html
+```html
+{% extends 'base.html' %}
+
+{% load humanize %}
+
+{% block content %}
+  <!-- code suppressed -->
+
+  <td>{{ topic.last_updated|naturaltime }}</td>
+
+  <!-- code suppressed -->
+{% endblock %}
 
 ## 头像
 
 ## 最后调整
+
+### 按回帖时间排序
+
+之前都是按照发帖时间对主题帖进行排序的，这样显然不太合理，我们应该按照发帖时间排序。
+
+修改boards/views.py里的`reply_topic`函数
+```python
+@login_required
+def reply_topic(request, pk, topic_pk):
+    topic = get_object_or_404(Topic, board__pk=pk, pk=topic_pk)
+    if request.method == 'POST':
+        form = PostForm(request.POST)
+        if form.is_valid():
+            post = form.save(commit=False)
+            post.topic = topic
+            post.created_by = request.user
+            post.save()
+
+            topic.last_updated = timezone.now()  # <- here
+            topic.save()                         # <- and here
+
+            return redirect('topic_posts', pk=pk, topic_pk=topic_pk)
+    else:
+        form = PostForm()
+    return render(request, 'reply_topic.html', {'topic': topic, 'form': form})
+```
+和PostListView类里的`get_context_data`函数
+```python
+class PostListView(ListView):
+    model = Post
+    context_object_name = 'posts'
+    template_name = 'topic_posts.html'
+    paginate_by = 20
+
+    def get_context_data(self, **kwargs):
+
+        session_key = 'viewed_topic_{}'.format(self.topic.pk)  # <-- here
+        if not self.request.session.get(session_key, False):
+            self.topic.views += 1
+            self.topic.save()
+            self.request.session[session_key] = True           # <-- until here
+
+        kwargs['topic'] = self.topic
+        return super().get_context_data(**kwargs)
+
+    def get_queryset(self):
+        self.topic = get_object_or_404(Topic, board__pk=self.kwargs.get('pk'), pk=self.kwargs.get('topic_pk'))
+        queryset = self.topic.posts.order_by('created_at')
+        return queryset
+```
+
+### 调整帖子
+
+修改导航栏，加入页数显示和发帖者
+
+首先，在models.py里面的Topic类添加一些函数：
+```python
+import math
+from django.db import models
+
+class Topic(models.Model):
+    # ...
+
+    def __str__(self):
+        return self.subject
+
+    def get_page_count(self):
+        count = self.posts.count()
+        pages = count / 20
+        return math.ceil(pages)
+
+    def has_many_pages(self, count=None):
+        if count is None:
+            count = self.get_page_count()
+        return count > 6
+
+    def get_page_range(self):
+        count = self.get_page_count()
+        if self.has_many_pages(count):
+            return range(1, 5)
+        return range(1, count + 1)
+```
+
+然后，在templates/topics.html里面部署
+```html
+<table class="table table-striped mb-4">
+    <thead class="thead-inverse">
+      <tr>
+        <th>Topic</th>
+        <th>Starter</th>
+        <th>Replies</th>
+        <th>Views</th>
+        <th>Last Update</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for topic in topics %}
+        {% url 'topic_posts' board.pk topic.pk as topic_url %}
+        <tr>
+          <td>
+            <p class="mb-0">
+              <a href="{{ topic_url }}">{{ topic.subject }}</a>
+            </p>
+            <small class="text-muted">
+              Pages:
+              {% for i in topic.get_page_range %}
+                <a href="{{ topic_url }}?page={{ i }}">{{ i }}</a>
+              {% endfor %}
+              {% if topic.has_many_pages %}
+              ... <a href="{{ topic_url }}?page={{ topic.get_page_count }}">Last Page</a>
+              {% endif %}
+            </small>
+          </td>
+          <td class="align-middle">{{ topic.starter.username }}</td>
+          <td class="align-middle">{{ topic.replies }}</td>
+          <td class="align-middle">{{ topic.views }}</td>
+          <td class="align-middle">{{ topic.last_updated|naturaltime }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+```
+
+### 优化回复页
+
+回复页只显示最新的10条回复
+
+boards/models.py
+```python
+class Topic(models.Model):
+    # ...
+
+    def get_last_ten_posts(self):
+        return self.posts.order_by('-created_at')[:10]
+```
+templates/reply_topic.html
+```python
+{% block content %}
+
+  <form method="post" class="mb-4" novalidate>
+    {% csrf_token %}
+    {% include 'includes/form.html' %}
+    <button type="submit" class="btn btn-success">Post a reply</button>
+  </form>
+
+  {% for post in topic.get_last_ten_posts %}  <!-- here! -->
+    <div class="card mb-2">
+      <!-- code suppressed -->
+    </div>
+  {% endfor %}
+
+{% endblock %}
+```
+
+### 优化回复后跳转
+
+回复帖子后跳转到最后页
+
+`templates/topic_posts.html`
+```html
+{% block content %}
+
+  <div class="mb-4">
+    <a href="{% url 'reply_topic' topic.board.pk topic.pk %}" class="btn btn-primary" role="button">Reply</a>
+  </div>
+
+  {% for post in posts %}
+    <div id="{{ post.pk }}" class="card {% if forloop.last %}mb-4{% else %}mb-2{% endif %} {% if forloop.first %}border-dark{% endif %}">
+      <!-- code suppressed -->
+    </div>
+  {% endfor %}
+
+  {% include 'includes/pagination.html' %}
+
+{% endblock %}
+```
+
+### 优化底部页数显示
 
 
 # Part7 部署
