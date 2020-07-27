@@ -69,12 +69,21 @@
 - [Part6 基于类的视图](#part6-基于类的视图)
     - [视图策略](#视图策略)
     - [更新视图](#更新视图)
-    - [视图列表(分页)](#视图列表分页)
+    - [视图列表](#视图列表)
+    - [分页](#分页)
+        - [FBV分页](#FBV分页)
+        - [GCBV分页](#GCBV分页)
+    - [可重用分页模板](#可重用分页模板)
     - [我的账户视图](#我的账户视图)
     - [支持markdown](#支持markdown)
+        - [markdown编辑器](#markdown编辑器)
     - [人性化设置](#人性化设置)
-    - [头像](#头像)
     - [最后调整](#最后调整)
+        - [按回帖时间排序](#按回帖时间排序)
+        - [显示页数](#显示页数)
+        - [优化回复页](#优化回复页)
+        - [优化回复后跳转](#优化回复后跳转)
+        - [优化底部页数显示](#优化底部页数显示)
 - [Part7 部署](#part7-部署)
 
 # Part1 入门
@@ -2588,6 +2597,8 @@ class Post(models.Model):
 
 ### markdown编辑器
 
+在支持markdown的基础上，可以使用markdown编辑器，SimpleMD
+
 ## 人性化设置
 
 修改最新回帖时间，显示为距离当前时间多久, 比如几分钟前、几小时前或几天前
@@ -2623,9 +2634,7 @@ INSTALLED_APPS = [
 
   <!-- code suppressed -->
 {% endblock %}
-
-## 头像
-
+```
 ## 最后调整
 
 ### 按回帖时间排序
@@ -2678,11 +2687,12 @@ class PostListView(ListView):
         return queryset
 ```
 
-### 调整帖子
+### 显示页数
 
-修改导航栏，加入页数显示和发帖者
+修改导航栏，加入页数显示
 
-首先，在models.py里面的Topic类添加一些函数：
+首先，在models.py里面的Topic类添加一些函数
+models.py
 ```python
 import math
 from django.db import models
@@ -2806,6 +2816,69 @@ templates/reply_topic.html
 
 ### 优化底部页数显示
 
+templates/includes/pagination.html
+```html
+{% if is_paginated %}
+  <nav aria-label="Topics pagination" class="mb-4">
+    <ul class="pagination">
+      {% if page_obj.number > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1">First</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">First</span>
+        </li>
+      {% endif %}
+
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Previous</span>
+        </li>
+      {% endif %}
+
+      {% for page_num in paginator.page_range %}
+        {% if page_obj.number == page_num %}
+          <li class="page-item active">
+            <span class="page-link">
+              {{ page_num }}
+              <span class="sr-only">(current)</span>
+            </span>
+          </li>
+        {% elif page_num > page_obj.number|add:'-3' and page_num < page_obj.number|add:'3' %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+          </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Next</span>
+        </li>
+      {% endif %}
+
+      {% if page_obj.number != paginator.num_pages %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ paginator.num_pages }}">Last</a>
+        </li>
+      {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">Last</span>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}
+```
 
 # Part7 部署
 
